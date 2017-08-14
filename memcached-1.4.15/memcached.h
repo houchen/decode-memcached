@@ -5,6 +5,10 @@
  * structures and function prototypes.
  */
 
+#ifndef HAVE_CONFIG_H
+#define HAVE_CONFIG_H
+#endif
+
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -74,6 +78,7 @@
 #define CHUNK_ALIGN_BYTES 8
 #define MAX_NUMBER_OF_SLAB_CLASSES (POWER_LARGEST + 1)
 
+//在没有多少内存的情况下，一个对象可以被锁定多久
 /** How long an object can reasonably be assumed to be locked before
     harvesting it on a low memory condition. */
 #define TAIL_REPAIR_TIME (3 * 3600)
@@ -291,6 +296,7 @@ struct settings {
 
     char *inter;
     int verbose;
+    //最大生存时间
     rel_time_t oldest_live; /* ignore existing items older than this */
     int evict_to_free;
 
@@ -305,7 +311,7 @@ struct settings {
     // 块大小
     int chunk_size;
 
-    // libevent 线程数
+    // worker 线程数
     int num_threads;        /* number of worker (without dispatcher) libevent threads to run */
 
     // ? 服务每个 UPD 连接的工作线程
@@ -331,21 +337,24 @@ extern struct stats stats;
 extern time_t process_started;
 extern struct settings settings;
 
-#define ITEM_LINKED 1
-#define ITEM_CAS 2
+#define ITEM_LINKED 1 //  item link 到 hash 表上了?
+#define ITEM_CAS 2 //item 有 cas
 
 /* temp */
-#define ITEM_SLABBED 4
+#define ITEM_SLABBED 4//当前 item flag 为此，表示可被使用
 
-#define ITEM_FETCHED 8
+#define ITEM_FETCHED 8 //item 被访问过
 
 /**
  * Structure for storing items within memcached.
  * 內部存储数据项数据结构
  */
 typedef struct _stritem {
-    struct _stritem *next; // 双向链表
+    //lru  双向链表
+    struct _stritem *next;
     struct _stritem *prev;
+
+    //hash 冲突链表
     struct _stritem *h_next;    /* hash chain next */
 
     // 最近访问的时间
@@ -361,7 +370,7 @@ typedef struct _stritem {
     unsigned short  refcount;
 
     uint8_t         nsuffix;    /* length of flags-and-length string */
-    uint8_t         it_flags;   /* ITEM_* above */
+    uint8_t         it_flags;   /* ITEM_* above item 属性*/
     uint8_t         slabs_clsid;/* which slab class we're in */
     // 键长度
     uint8_t         nkey;       /* key length, w/terminating null and padding */
@@ -538,15 +547,16 @@ extern volatile rel_time_t current_time;
 extern volatile int slab_rebalance_signal;
 
 struct slab_rebalance {
-    void *slab_start;
-    void *slab_end;
-    void *slab_pos;
-    int s_clsid;
-    int d_clsid;
+    void *slab_start; // 该 slab 页的开始位置
+    void *slab_end;//slab 的结束位置
+    void *slab_pos;//当前处理到哪了
+    int s_clsid;//源 class id
+    int d_clsid;//目标 class id
     int busy_items;
-    uint8_t done;
+    uint8_t done; //slab rebalance 是否已经结束
 };
 
+//全局 rebalance 情况
 extern struct slab_rebalance slab_rebal;
 
 /*

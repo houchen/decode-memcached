@@ -1,0 +1,3 @@
+*.o
+memcached-1.4.15/.idea/
+.idea/

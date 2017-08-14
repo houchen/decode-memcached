@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6"/>
+	<Project>
+		<Option title="decode_memcached"/>
+		<Option makefile_is_custom="1"/>
+		<Option compiler="gcc"/>
+		<Option virtualFolders="CMake Files\;"/>
+		<Build>
+			<Target title="all">
+				<Option working_dir="/Users/houchen/workspace/decode-memcached/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/Users/houchen/workspace/decode-memcached/cmake-build-debug/Makefile&quot;  VERBOSE=1 all"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/Users/houchen/workspace/decode-memcached/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/Users/houchen/workspace/decode-memcached/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/Users/houchen/workspace/decode-memcached/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="rebuild_cache">
+				<Option working_dir="/Users/houchen/workspace/decode-memcached/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/Users/houchen/workspace/decode-memcached/cmake-build-debug/Makefile&quot;  VERBOSE=1 rebuild_cache"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/Users/houchen/workspace/decode-memcached/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/Users/houchen/workspace/decode-memcached/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/Users/houchen/workspace/decode-memcached/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="edit_cache">
+				<Option working_dir="/Users/houchen/workspace/decode-memcached/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/Users/houchen/workspace/decode-memcached/cmake-build-debug/Makefile&quot;  VERBOSE=1 edit_cache"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/Users/houchen/workspace/decode-memcached/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/Users/houchen/workspace/decode-memcached/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/Users/houchen/workspace/decode-memcached/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="decode_memcached">
+				<Option output="/Users/houchen/workspace/decode-memcached/cmake-build-debug/decode_memcached" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/Users/houchen/workspace/decode-memcached/cmake-build-debug"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add directory="/Library/Developer/CommandLineTools/usr/bin/../include/c++/v1"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/Library/Developer/CommandLineTools/usr/bin/../lib/clang/8.1.0/include"/>
+					<Add directory="/Library/Developer/CommandLineTools/usr/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/System/Library/Frameworks"/>
+					<Add directory="/Library/Frameworks"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/Users/houchen/workspace/decode-memcached/cmake-build-debug/Makefile&quot;  VERBOSE=1 decode_memcached"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/Users/houchen/workspace/decode-memcached/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/Users/houchen/workspace/decode-memcached/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/Users/houchen/workspace/decode-memcached/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="decode_memcached/fast">
+				<Option output="/Users/houchen/workspace/decode-memcached/cmake-build-debug/decode_memcached" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/Users/houchen/workspace/decode-memcached/cmake-build-debug"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add directory="/Library/Developer/CommandLineTools/usr/bin/../include/c++/v1"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/Library/Developer/CommandLineTools/usr/bin/../lib/clang/8.1.0/include"/>
+					<Add directory="/Library/Developer/CommandLineTools/usr/include"/>
+					<Add directory="/usr/include"/>
+					<Add directory="/System/Library/Frameworks"/>
+					<Add directory="/Library/Frameworks"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j4 -f &quot;/Users/houchen/workspace/decode-memcached/cmake-build-debug/Makefile&quot;  VERBOSE=1 decode_memcached/fast"/>
+					<CompileFile command="/usr/bin/make -j4 -f &quot;/Users/houchen/workspace/decode-memcached/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j4 -f &quot;/Users/houchen/workspace/decode-memcached/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j4 -f &quot;/Users/houchen/workspace/decode-memcached/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+		</Build>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/assoc.c">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/assoc.h">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/cache.c">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/cache.h">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/config.h">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/daemon.c">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/hash.c">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/hash.h">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/items.c">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/items.h">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/memcached.c">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/memcached.h">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/protocol_binary.h">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/sasl_defs.c">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/sasl_defs.h">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/sizes.c">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/slabs.c">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/slabs.h">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/solaris_priv.c">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/stats.c">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/stats.h">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/testapp.c">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/thread.c">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/timedrun.c">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/trace.h">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/util.c">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/memcached-1.4.15/util.h">
+			<Option target="decode_memcached"/>
+		</Unit>
+		<Unit filename="/Users/houchen/workspace/decode-memcached/CMakeLists.txt">
+			<Option virtualFolder="CMake Files\"/>
+		</Unit>
+	</Project>
+</CodeBlocks_project_file>

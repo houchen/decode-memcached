@@ -769,7 +769,7 @@ static int add_iov(conn *c, const void *buf, int len) {
         if (m->msg_iovlen == IOV_MAX ||
             (limit_to_mtu && c->msgbytes >= UDP_MAX_PAYLOAD_SIZE)) {
             add_msghdr(c);
-            m = &c->msglist[c->msgused - 1];+
+            m = &c->msglist[c->msgused - 1];
         }
 
         if (ensure_iov_space(c) != 0)
@@ -2337,6 +2337,9 @@ static void reset_cmd_handler(conn *c) {
     }
 }
 
+//完成一个 item 的存储
+//回复客户端，释放 conn 对象上的 item 引用
+//准备下一个命令
 static void complete_nread(conn *c) {
     assert(c != NULL);
     assert(c->protocol == ascii_prot
@@ -2354,8 +2357,9 @@ static void complete_nread(conn *c) {
  * commands. In threaded mode, this is protected by the cache lock.
  *
  * Returns the state of storage. 返回存储结果
+ * comm 是命令
  */
-enum store_item_type do_store_item(item *it, int comm, conn *c, const uint32_t hv) {                                        comm 是命令
+enum store_item_type do_store_item(item *it, int comm, conn *c, const uint32_t hv) {
     char *key = ITEM_key(it);
 
     // 获取旧的数据项
@@ -2367,6 +2371,7 @@ enum store_item_type do_store_item(item *it, int comm, conn *c, const uint32_t h
     item *new_it = NULL;
     int flags;
 
+    //add 命令，item 不存在时才成功
     if (old_it != NULL && comm == NREAD_ADD) {
         /* add only adds a nonexistent item, but promote to head of LRU */
         // 数据项不为空, 更新时间
@@ -2375,8 +2380,8 @@ enum store_item_type do_store_item(item *it, int comm, conn *c, const uint32_t h
     } else if (!old_it && (comm == NREAD_REPLACE
         || comm == NREAD_APPEND || comm == NREAD_PREPEND))
     {
+        //如果是 replace、prepend、append ，key 不存在什么都不做
         /* replace only replaces an existing value; don't store */
-        // 居然是空操作
     } else if (comm == NREAD_CAS) {
         /* validate cas operation */
 
@@ -2397,6 +2402,9 @@ enum store_item_type do_store_item(item *it, int comm, conn *c, const uint32_t h
         // #define ITEM_get_cas(i) (((i)->it_flags & ITEM_CAS) ? \
         // (i)->data->cas : (uint64_t)0)
         else if (ITEM_get_cas(it) == ITEM_get_cas(old_it)) {
+            //cas 操作
+            //客户端提供的 cas 和当前旧 item cas一样，则 replace 成功
+            //否则 cas 失败
             // cas validates
             // it and old_it may belong to different classes.
             // I'm updating the stats for the one that's getting pushed out
@@ -2437,6 +2445,8 @@ enum store_item_type do_store_item(item *it, int comm, conn *c, const uint32_t h
                 }
             }
 
+            //cas ok 的话，分配新的空间存储起来
+            //把旧数据拷贝到新空间里
             if (stored == NOT_STORED) {
                 /* we have it and old_it here - alloc memory to hold both */
                 /* flags was already lost - so recover them from ITEM_suffix(it) */
@@ -2470,10 +2480,13 @@ enum store_item_type do_store_item(item *it, int comm, conn *c, const uint32_t h
             }
         }
 
+        //add\set
         if (stored == NOT_STORED) {
             if (old_it != NULL)
                 item_replace(old_it, it, hv);
             else
+                //hv 本来就找不到 item，就省一步删除操作
+                //do_item_unlink(it, hv);
                 do_item_link(it, hv);
 
             c->cas = ITEM_get_cas(it);
@@ -2482,6 +2495,7 @@ enum store_item_type do_store_item(item *it, int comm, conn *c, const uint32_t h
         }
     }
 
+    //都存好了，新旧 item 的引用都释放掉，适时还给 slab
     if (old_it != NULL)
         do_item_remove(old_it);         /* release our reference */
     if (new_it != NULL)
@@ -2978,6 +2992,15 @@ static inline void process_get_command(conn *c, token_t *tokens, size_t ntokens,
     return;
 }
 
+//add
+//set = setnx
+//replace = setex
+// 0               1      2       3         4
+//<command name> <key> <flags> <exptime> <bytes>\r\n
+//set username 0 10 11
+//houchenchen
+//
+// process_update_command -> item_alloc -> do_item_alloc
 static void process_update_command(conn *c, token_t *tokens, const size_t ntokens, int comm, bool handle_cas) {
     char *key;
     size_t nkey;
@@ -3036,6 +3059,7 @@ static void process_update_command(conn *c, token_t *tokens, const size_t ntoken
 
     it = item_alloc(key, nkey, flags, realtime(exptime), vlen);
 
+    //分配失败
     if (it == 0) {
         if (! item_size_ok(nkey, flags, vlen))
             out_string(c, "SERVER_ERROR object too large for cache");
@@ -3045,6 +3069,7 @@ static void process_update_command(conn *c, token_t *tokens, const size_t ntoken
         c->write_and_go = conn_swallow;
         c->sbytes = vlen;
 
+        //如果是 set 命令，就试着删除 it
         /* Avoid stale data persisting in cache because we failed alloc.
          * Unacceptable for SET. Anywhere else too? */
         if (comm == NREAD_SET) {
@@ -4002,7 +4027,10 @@ static void drive_machine(conn *c) {
                 // 关键要看是否还需要读取数据
                 reset_cmd_handler(c);
             } else {
-                // io 次数超出一定的限制, 譬如读了二十次, 也就是 libevent 被触发读了 20 次, 可能会被中断操作
+                // 一次事件命令处理次数超出一定的限制
+                //就先暂停当前连接的处理，设置可写水平触发
+                //客户端可写时，则会继续处理命令
+                //防止卡死其他客户端请求
                 pthread_mutex_lock(&c->thread->stats.mutex);
                 c->thread->stats.conn_yields++;
                 pthread_mutex_unlock(&c->thread->stats.mutex);
@@ -4025,7 +4053,6 @@ static void drive_machine(conn *c) {
 
         // 真正执行命令的地方
         case conn_nread:
-            // 如果已经把所有的数据读完了, 直接执行命令
             if (c->rlbytes == 0) {
                 complete_nread(c);
                 break;
@@ -4273,6 +4300,7 @@ static int new_socket(struct addrinfo *ai) {
 
 
 /*
+ *  二分法找到最大的 buf
  * Sets a socket's send buffer size to the maximum allowed by the system.
  */
 static void maximize_sndbuf(const int sfd) {
@@ -4540,7 +4568,7 @@ static int new_socket_unix(void) {
 static int server_socket_unix(const char *path, int access_mask) {
     // path 在 serttings 中指定
 
-    int sfd;iu
+    int sfd;
     struct linger ling = {0, 0};
     struct sockaddr_un addr;
     struct stat tstat;

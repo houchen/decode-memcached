@@ -424,7 +424,10 @@ static void thread_libevent_process(int fd, short which, void *arg) {
     item = cq_pop(me->new_conn_queue);
 
     if (NULL != item) {
-        // 为新的请求建立一个连接结构体. 连接其实已经建立, 这里只是为了填充连接结构体. 最关键的动作是在 libevent 中注册了事件, 回调函数是 event_handler()
+        // 为新的请求建立一个连接结构体.
+        // 分配连接的buffer
+        // 连接其实已经建立, 这里只是为了填充连接结构体.
+        // 最关键的动作是在 libevent 中注册了事件, 回调函数是 event_handler()
         conn *c = conn_new(item->sfd, item->init_state, item->event_flags,
                            item->read_buffer_size, item->transport, me->base);
         if (c == NULL) {

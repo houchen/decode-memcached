@@ -54,6 +54,7 @@ static bool expanding = false;
 static bool started_expanding = false;
 
 /*
+ * 在rehash 的时候，我们到哪个 hash key了
  * During expansion we migrate values with bucket granularity; this is how
  * far we've gotten so far. Ranges from 0 .. hashsize(hashpower - 1) - 1.
  */
@@ -145,6 +146,7 @@ static void assoc_expand(void) {
     }
 }
 
+//maintenance_cond
 static void assoc_start_expand(void) {
     if (started_expanding)
         return;
@@ -158,7 +160,8 @@ int assoc_insert(item *it, const uint32_t hv) {
 
 //    assert(assoc_find(ITEM_key(it), it->nkey) == 0);  /* shouldn't have duplicately named things defined */
 
-    // 头插法
+    //头插法
+    //在扩张的话，并且rehash 还没到新 key 的 hash 所在槽，就插到旧表
     if (expanding &&
         (oldbucket = (hv & hashmask(hashpower - 1))) >= expand_bucket)
     {
@@ -217,6 +220,7 @@ static void *assoc_maintenance_thread(void *arg) {
         item_lock_global();
         mutex_lock(&cache_lock);
 
+        //一次移动 hash_bulk_move 个槽
         for (ii = 0; ii < hash_bulk_move && expanding; ++ii) {
             item *it, *next;
             int bucket;
@@ -232,6 +236,8 @@ static void *assoc_maintenance_thread(void *arg) {
             old_hashtable[expand_bucket] = NULL;
 
             expand_bucket++;
+            //把所有槽都 rehash 完了，就释放原来的 hashtable
+            //然后暂停 rehash
             if (expand_bucket == hashsize(hashpower - 1)) {
                 expanding = false;
                 free(old_hashtable);
@@ -248,6 +254,7 @@ static void *assoc_maintenance_thread(void *arg) {
         item_unlock_global();
 
         if (!expanding) {
+
             /* finished expanding. tell all threads to use fine-grained locks */
             switch_item_lock_type(ITEM_LOCK_GRANULAR);
             slabs_rebalancer_resume();
@@ -255,6 +262,9 @@ static void *assoc_maintenance_thread(void *arg) {
             mutex_lock(&cache_lock);
             started_expanding = false;
             pthread_cond_wait(&maintenance_cond, &cache_lock);
+            //上面是一轮 rehash 停止的地方
+
+            //下面是下一轮rehash 开始的地方
             /* Before doing anything, tell threads to use a global lock */
             mutex_unlock(&cache_lock);
             slabs_rebalancer_pause();
@@ -269,6 +279,10 @@ static void *assoc_maintenance_thread(void *arg) {
 
 static pthread_t maintenance_tid;
 
+//main 函数调用创建 rehash 线程
+//通过环境变量设置一次 rehash 多少个元素
+//线程创建后, 全局变量 expanding 为 false，不需要扩张
+//线程随后在信号量 maintenance_cond 上挂起...
 int start_assoc_maintenance_thread() {
     int ret;
     char *env = getenv("MEMCACHED_HASH_BULK_MOVE");

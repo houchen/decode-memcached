@@ -24,7 +24,7 @@
 /* powers-of-N allocation structures */
 
 typedef struct {
-    // 每个内存块大小
+    // 本 slab 的 item 大小
     unsigned int size;      /* sizes of items */
     // 每个 slab 内存块的数量
     unsigned int perslab;   /* how many items per slab */
@@ -42,6 +42,8 @@ typedef struct {
     void **slab_list;       /* array of slab pointers */
     unsigned int list_size; /* size of prev array */
 
+    //标记某个 slab 不能用了,正在 rebalance
+    //killing+1 是正在 rebalance 的 slab 下标
     unsigned int killing;  /* index+1 of dying slab, or zero if none */
     size_t requested; /* The number of requested bytes */
 } slabclass_t;
@@ -49,7 +51,7 @@ typedef struct {
 static slabclass_t slabclass[MAX_NUMBER_OF_SLAB_CLASSES];
 static size_t mem_limit = 0;
 static size_t mem_malloced = 0;
-static int power_largest;
+static int power_largest;//当前 slabclass 占了几个元素去做分配
 
 static void *mem_base = NULL;
 static void *mem_current = NULL;
@@ -106,6 +108,9 @@ void slabs_init(const size_t limit, const double factor, const bool prealloc) {
     mem_limit = limit;
 
     if (prealloc) {
+        // 先占一大块内存，然后再进行分配
+        // 内存占好了之后，就先从占好的内存里分配
+        //可选
         /* Allocate everything in a big chunk with malloc */
         mem_base = malloc(mem_limit);
         if (mem_base != NULL) {
@@ -119,7 +124,9 @@ void slabs_init(const size_t limit, const double factor, const bool prealloc) {
 
     memset(slabclass, 0, sizeof(slabclass));
 
+    //初始化 slabclass 数组
     while (++i < POWER_LARGEST && size <= settings.item_size_max / factor) {
+        //对齐，所以slabclass 不是准确的1.25倍递增
         /* Make sure items are always n-byte aligned */
         if (size % CHUNK_ALIGN_BYTES)
             size += CHUNK_ALIGN_BYTES - (size % CHUNK_ALIGN_BYTES);
@@ -178,6 +185,7 @@ static void slabs_preallocate (const unsigned int maxslabs) {
 
 }
 
+//slab 的 slab_list 增加两倍
 static int grow_slab_list (const unsigned int id) {
     slabclass_t *p = &slabclass[id];
     if (p->slabs == p->list_size) {
@@ -199,10 +207,13 @@ static void split_slab_page_into_freelist(char *ptr, const unsigned int id) {
     }
 }
 
+//默认分配 perslab*size 大小的内存
+//然后分成 item size 大小的块放到空闲列表
 static int do_slabs_newslab(const unsigned int id) {
     slabclass_t *p = &slabclass[id];
 
     // 计算需要分配内存的大小
+    //如果需要重 reassign 到另外的 class，那就用另外的
     int len = settings.slab_reassign ? settings.item_size_max
         : p->size * p->perslab;
     char *ptr;
@@ -242,12 +253,14 @@ static void *do_slabs_alloc(const size_t size, unsigned int id) {
     p = &slabclass[id];
     assert(p->sl_curr == 0 || ((item *)p->slots)->slabs_clsid == 0);
 
+    //没有空槽，还分配不成功，失败。。。
     /* fail unless we have space at the end of a recently allocated page,
        we have something on our freelist, or we could allocate a new page */
     if (! (p->sl_curr != 0 || do_slabs_newslab(id) != 0)) {
         /* We don't have more memory available */
         ret = NULL;
     } else if (p->sl_curr != 0) {
+        //从 freelist 里拿一个
         /* return off our freelist */
         it = (item *)p->slots;
         p->slots = it->next;
@@ -266,6 +279,7 @@ static void *do_slabs_alloc(const size_t size, unsigned int id) {
     return ret;
 }
 
+//头插到 id 对应的 slab 空闲列表
 static void do_slabs_free(void *ptr, const size_t size, unsigned int id) {
     slabclass_t *p;
     item *it;
@@ -285,7 +299,7 @@ static void do_slabs_free(void *ptr, const size_t size, unsigned int id) {
     if (it->next) it->next->prev = it;
     p->slots = it;
 
-    p->sl_curr++;
+    p->sl_curr++;//空槽数量++
     p->requested -= size;
     return;
 }
@@ -453,8 +467,11 @@ static volatile int do_run_slab_thread = 1;
 static volatile int do_run_slab_rebalance_thread = 1;
 
 #define DEFAULT_SLAB_BULK_CHECK 1
-int slab_bulk_check = DEFAULT_SLAB_BULK_CHECK;
+int slab_bulk_check = DEFAULT_SLAB_BULK_CHECK;//环境变量MEMCACHED_SLAB_BULK_CHECK 设置
 
+//主要对src slab 做正在 rebalance 的标记
+//1.分配目标slab class 的 slabs 数组
+//2.标记要移动的源 slab 块
 static int slab_rebalance_start(void) {
     slabclass_t *s_cls;
     int no_go = 0;
@@ -471,6 +488,7 @@ static int slab_rebalance_start(void) {
 
     s_cls = &slabclass[slab_rebal.s_clsid];
 
+    //准备目标 slab 的 slab_list
     if (!grow_slab_list(slab_rebal.d_clsid)) {
         no_go = -1;
     }
@@ -486,6 +504,7 @@ static int slab_rebalance_start(void) {
 
     s_cls->killing = 1;
 
+    //一次移动一个 slab 块
     slab_rebal.slab_start = s_cls->slab_list[s_cls->killing - 1];
     slab_rebal.slab_end   = (char *)slab_rebal.slab_start +
         (s_cls->size * s_cls->perslab);
@@ -513,6 +532,8 @@ enum move_status {
     MOVE_PASS=0, MOVE_DONE, MOVE_BUSY, MOVE_LOCKED
 };
 
+//源slab 上有 item，那就直接删掉
+//如果 item 是 busy 状态，那就等一下
 /* refcount == 0 is safe since nobody can incr while cache_lock is held.
  * refcount != 0 is impossible since flags/etc can be modified in other
  * threads. instead, note we found a busy one and bail. logic in do_item_get
@@ -542,6 +563,7 @@ static int slab_rebalance_move(void) {
                 refcount = refcount_incr(&it->refcount);
                 if (refcount == 1) { /* item is unlinked, unused */
                     if (it->it_flags & ITEM_SLABBED) {
+                        //当前源 slab 里 slab_rebal.slab_pos 没有被分配出去
                         /* remove from slab freelist */
                         if (s_cls->slots == it) {
                             s_cls->slots = it->next;
@@ -555,6 +577,7 @@ static int slab_rebalance_move(void) {
                     }
                 } else if (refcount == 2) { /* item is linked but not busy */
                     if ((it->it_flags & ITEM_LINKED) != 0) {
+                        //在 lru，hash 表，slab 上释放 item
                         do_item_unlink_nolock(it, hash(ITEM_key(it), it->nkey, 0));
                         status = MOVE_DONE;
                     } else {
@@ -590,6 +613,7 @@ static int slab_rebalance_move(void) {
                 break;
         }
 
+        //检查源 slab 里的下一个 item...
         slab_rebal.slab_pos = (char *)slab_rebal.slab_pos + s_cls->size;
         if (slab_rebal.slab_pos >= slab_rebal.slab_end)
             break;
@@ -597,6 +621,8 @@ static int slab_rebalance_move(void) {
 
     if (slab_rebal.slab_pos >= slab_rebal.slab_end) {
         /* Some items were busy, start again from the top */
+        //如果上次一扫描，有被其他 worker 锁定的 item
+        //重置扫描位置，从新扫描一遍...
         if (slab_rebal.busy_items) {
             slab_rebal.slab_pos = slab_rebal.slab_start;
             slab_rebal.busy_items = 0;
@@ -622,11 +648,14 @@ static void slab_rebalance_finish(void) {
     d_cls   = &slabclass[slab_rebal.d_clsid];
 
     /* At this point the stolen slab is completely clear */
+    //把干掉的 slab 下标，指向最后一个
+    //相当于干掉了这个 slab
     s_cls->slab_list[s_cls->killing - 1] =
         s_cls->slab_list[s_cls->slabs - 1];
     s_cls->slabs--;
     s_cls->killing = 0;
 
+    //清空 slab内容，然后连接到目标 slab 的空闲链表上
     memset(slab_rebal.slab_start, 0, (size_t)settings.item_size_max);
 
     d_cls->slab_list[d_cls->slabs++] = slab_rebal.slab_start;
@@ -640,8 +669,11 @@ static void slab_rebalance_finish(void) {
     slab_rebal.slab_end   = NULL;
     slab_rebal.slab_pos   = NULL;
 
+    //关闭 rebalance 全局标志
+    //rebalance 线程会挂起...
     slab_rebalance_signal = 0;
 
+    //释放相关资源，设置相关状态
     pthread_mutex_unlock(&slabs_lock);
     pthread_mutex_unlock(&cache_lock);
 
@@ -655,6 +687,8 @@ static void slab_rebalance_finish(void) {
     }
 }
 
+//选定两个需要 rebalance 的 class
+//没有返回0
 /* Return 1 means a decision was reached.
  * Move to its own thread (created/destroyed as needed) once automover is more
  * complex.
@@ -723,6 +757,8 @@ static int slab_automove_decision(int *src, int *dst) {
     return 0;
 }
 
+//重新调整 slab 间的平衡
+//这个线程只是定时调用 slabs_reassign 去 rebalance slab，自己并不去真正做 rebalance 的事
 /* Slab rebalancer thread.
  * Does not use spinlocks since it is not timing sensitive. Burn less CPU and
  * go to sleep if locks are contended
@@ -746,6 +782,8 @@ static void *slab_maintenance_thread(void *arg) {
     return NULL;
 }
 
+//main 函数刚调用后，挂起在 slab_rebalance_cond 信号量
+//当需要开始 rebalance，do_run_slab_rebalance_thread 会被设为1/2，信号量挂起会被唤醒
 /* Slab mover thread.
  * Sits waiting for a condition to jump off and shovel some memory about
  */
@@ -756,6 +794,7 @@ static void *slab_rebalance_thread(void *arg) {
 
     while (do_run_slab_rebalance_thread) {
         if (slab_rebalance_signal == 1) {
+            // 分配目标 slab class 的指针数组，标记源 slab 块不可用，设置全局 slab_rebal.
             if (slab_rebalance_start() < 0) {
                 /* Handle errors with more specifity as required. */
                 slab_rebalance_signal = 0;
@@ -763,18 +802,26 @@ static void *slab_rebalance_thread(void *arg) {
 
             was_busy = 0;
         } else if (slab_rebalance_signal && slab_rebal.slab_start != NULL) {
+            //检查 slab 里每个 item
             was_busy = slab_rebalance_move();
         }
 
         if (slab_rebal.done) {
             slab_rebalance_finish();
         } else if (was_busy) {
+            //item 被锁定了，等一下
             /* Stuck waiting for some items to unlock, so slow down a bit
              * to give them a chance to free up */
             usleep(50);
         }
 
         if (slab_rebalance_signal == 0) {
+            //pthread_cond_wait 挂起时释放锁，唤醒时获得锁
+            //刚启动 rebalance 线程时，会在这里挂起
+            //slabs_reassign() 下发一次 rebalance 指令
+            //在信号量上唤醒当前线程(slab reassign ,do_item_alloc 会触发 slabs_reassign)
+            //当 rebalance 完成，slab_rebalance_finish() 设置全局状态为0，继续在这里挂起
+            //等待下一次 rebalance...
             /* always hold this lock while we're running */
             pthread_cond_wait(&slab_rebalance_cond, &slabs_rebalance_lock);
         }
@@ -802,6 +849,7 @@ static int slabs_reassign_pick_any(int dst) {
     return -1;
 }
 
+//src dst slab class 的 id
 static enum reassign_result_type do_slabs_reassign(int src, int dst) {
     if (slab_rebalance_signal != 0)
         return REASSIGN_RUNNING;
@@ -831,6 +879,7 @@ static enum reassign_result_type do_slabs_reassign(int src, int dst) {
     return REASSIGN_OK;
 }
 
+//重新在 src 和 dst 之间分配 page
 enum reassign_result_type slabs_reassign(int src, int dst) {
     enum reassign_result_type ret;
     if (pthread_mutex_trylock(&slabs_rebalance_lock) != 0) {
@@ -871,11 +920,14 @@ int start_slab_maintenance_thread(void) {
     }
     pthread_mutex_init(&slabs_rebalance_lock, NULL);
 
+    //slab_maintenance_thread  线程主要是检查各个 slab 是否需要 rebalance
     if ((ret = pthread_create(&maintenance_tid, NULL,
                               slab_maintenance_thread, NULL)) != 0) {
         fprintf(stderr, "Can't create slab maint thread: %s\n", strerror(ret));
         return -1;
     }
+
+    //rebalance 的实质工作线程
     if ((ret = pthread_create(&rebalance_tid, NULL,
                               slab_rebalance_thread, NULL)) != 0) {
         fprintf(stderr, "Can't create rebal thread: %s\n", strerror(ret));
